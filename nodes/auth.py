@@ -108,17 +108,14 @@ def auth_node(state: dict) -> dict:
         if otp_result == "sms":
             task     = f"A 6-digit SMS verification code was sent to {phone}. Tell the user to check their messages and enter the code."
             fallback = f"I've sent a 6-digit code to {phone}. Please check your messages and enter it to continue."
+            response = chat_response(task, {}, user_input, max_tokens=80, language=language) or fallback
         elif otp_result == "email":
             task     = "A 6-digit verification code was sent to the user's email address. Tell the user to check their inbox (and spam folder) and enter the code."
             fallback = "I've sent a 6-digit verification code to your email. Please check your inbox and enter it here."
+            response = chat_response(task, {}, user_input, max_tokens=80, language=language) or fallback
         else:
-            task     = f"We were unable to send a code externally. Give the user their verification code: {code}, and ask them to enter it now to continue."
-            fallback = f"Your verification code is: {code}. Please enter it to continue."
-
-        response = chat_response(task, {}, user_input, max_tokens=80, language=language) or fallback
-
-        if otp_result is False and str(code) not in response:
-            response = f"{response}\n{fallback}" if response != fallback else fallback
+            # Dev mode: no external delivery — skip LLM (system prompt blocks sharing codes) and show directly
+            response = f"Your verification code is: {code}. Please enter it to continue."
 
         msg = AIMessage(content=response)
         return {
