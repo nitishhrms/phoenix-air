@@ -80,7 +80,7 @@ def present_flights_node(state: dict) -> dict:
         ctx      = {"sort_type": sort_label, "flight_count": len(sorted_flights)}
         task     = f"User wants flights sorted by {sort_label}. Acknowledge and invite them to pick one."
         fallback = f"Sure! Here are the flights sorted by {sort_label}. Which one would you like?"
-        response = chat_response(task, ctx, user_input, language=language) or fallback
+        response = chat_response(task, ctx, user_input, language=language, skip_hallucination_guard=False) or fallback
         msg = AIMessage(content=response)
         return {
             **state,
@@ -99,7 +99,7 @@ def present_flights_node(state: dict) -> dict:
         ctx      = {"available_options": options}
         task     = f"User's selection wasn't understood. List options ({options}) and ask which they prefer."
         fallback = f"I didn't catch that. You can say {options}. Which would you prefer?"
-        response = chat_response(task, ctx, user_input, language=language) or fallback
+        response = chat_response(task, ctx, user_input, language=language, skip_hallucination_guard=False) or fallback
         msg = AIMessage(content=response)
         return {**state, "response": response, "retry_count": retry_count, "messages": messages + [msg]}
 
@@ -119,7 +119,7 @@ def present_flights_node(state: dict) -> dict:
         f"Great choice! {selected.get('airline')} flight {selected.get('flightNumber')}. "
         "Could I get your full name for the booking?"
     )
-    response = chat_response(task, ctx, user_input, language=language) or fallback
+    response = chat_response(task, ctx, user_input, language=language, skip_hallucination_guard=False) or fallback
 
     # ── Self-reflection: verify response mentions the correct flight ─
     if not self_reflect_confirmation(selected, response):

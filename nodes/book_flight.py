@@ -82,7 +82,7 @@ def book_flight_node(state: dict) -> dict:
         f"Thanks, {first}! Your total is ${price:.2f}. "
         "Shall I proceed with payment? Say yes to confirm."
     )
-    response = chat_response(task, ctx, user_input, language=language) or fallback
+    response = chat_response(task, ctx, user_input, language=language, skip_hallucination_guard=False) or fallback
     msg = AIMessage(content=response)
 
     return {

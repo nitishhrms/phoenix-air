@@ -15,6 +15,17 @@ Anthropic caches them across calls, reducing latency and cost.
 import os
 import concurrent.futures
 
+# ── Anthropic client singleton ────────────────────────────────────────────────
+_anthropic_client = None
+
+def _get_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        import anthropic
+        _anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+    return _anthropic_client
+
+
 # ── Static system prompt (cached across all calls) ───────────────────────────
 _STATIC_SYSTEM = (
     "You are Phoenix Air's friendly voice booking assistant.\n\n"
@@ -47,8 +58,7 @@ _LANG_INSTRUCTIONS: dict[str, str] = {
 # ── Internal: raw Haiku call with prompt caching ──────────────────────────────
 
 def _call_haiku(dynamic_system: str, user_msg: str, max_tokens: int) -> str:
-    import anthropic
-    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+    client = _get_client()
     msg = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=max_tokens,
@@ -102,8 +112,7 @@ def _hallucination_check(user_input: str, response: str, context_str: str) -> bo
         return True
     try:
         def _check():
-            import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
+            client = _get_client()
             msg = client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=16,
@@ -172,8 +181,7 @@ def cot_analyze_flights(flights: list, src_city: str, dst_city: str, date_str: s
     ])
 
     def _run():
-        import anthropic
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+        client = _get_client()
         msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=400,
@@ -237,8 +245,7 @@ def self_reflect_confirmation(selected: dict, response: str) -> bool:
         return True
     try:
         def _check():
-            import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
+            client = _get_client()
             flight_info = f"{selected.get('airline', '')} {selected.get('flightNumber', '')}"
             msg = client.messages.create(
                 model="claude-haiku-4-5-20251001",
@@ -266,7 +273,7 @@ def self_reflect_confirmation(selected: dict, response: str) -> bool:
 
 def chat_response(task: str, context: dict = None, user_input: str = "",
                   max_tokens: int = 120, language: str = "en",
-                  skip_hallucination_guard: bool = False) -> str | None:
+                  skip_hallucination_guard: bool = True) -> str | None:
     chat_response.last_was_llm = False
     """
     Generate a short conversational response via Claude Haiku.
