@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "Bash(python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(ping -n 4 127.0.0.1)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(echo.)",
+      "Bash(curl -s -X POST http://localhost:8000/api/voice -H \"Content-Type: application/json\" -d \"{\\\\\"text\\\\\":\\\\\"\\\\\",\\\\\"session_id\\\\\":\\\\\"test-001\\\\\",\\\\\"caller_phone\\\\\":\\\\\"\\\\\"}\")",
+      "Bash(python -m uvicorn main:app --host 0.0.0.0 --port 8000)",
+      "Bash(ping *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/health\" -Method GET | ConvertTo-Json)",
+      "Bash(python *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8000)",
+      "Bash(taskkill *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Start-Process -FilePath \"python\" -ArgumentList \"-m\", \"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\", \"--reload\" -WorkingDirectory \"D:\\\\phonely project\\\\phonely-airline\" -WindowStyle Normal; Write-Host \"Server starting...\")",
+      "PowerShell(Start-Sleep -Seconds 5; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/health\" -UseBasicParsing -TimeoutSec 5; Write-Host \"UP:\" $r.Content } catch { Write-Host \"Not up yet:\" $_.Exception.Message })",
+      "PowerShell($body = '{\"text\":\"\",\"session_id\":\"test-123\",\"caller_phone\":\"\"}'; $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/voice\" -Method POST -Body $body -ContentType \"application/json\" -UseBasicParsing -TimeoutSec 10; $r.Content)",
+      "PowerShell(Start-Process \"http://localhost:8000/app/index.html\")",
+      "PowerShell($body = '{\"text\":\"4082100170\",\"session_id\":\"test-phone-fix\",\"caller_phone\":\"\"}'; $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/voice\" -Method POST -Body $body -ContentType \"application/json\" -UseBasicParsing -TimeoutSec 10; $r.Content)",
+      "PowerShell(python \"C:\\\\Users\\\\Anush\\\\.claude\\\\jobs\\\\a823f5d2\\\\test_otp.py\" 2>&1)",
+      "PowerShell($b = '{\"text\":\"4082100170\",\"session_id\":\"test-dev-otp\",\"caller_phone\":\"\"}'; $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/voice\" -Method POST -Body $b -ContentType \"application/json\" -UseBasicParsing; \\($r.Content | ConvertFrom-Json\\).response)",
+      "PowerShell(Start-Sleep -Seconds 3; $b = '{\"text\":\"4082100170\",\"session_id\":\"test-otp-fresh\",\"caller_phone\":\"\"}'; $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/voice\" -Method POST -Body $b -ContentType \"application/json\" -UseBasicParsing; \\($r.Content | ConvertFrom-Json\\).response)",
+      "PowerShell(Start-Sleep -Seconds 6; $b = '{\"text\":\"4082100170\",\"session_id\":\"otp-test-clean\",\"caller_phone\":\"\"}'; $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/voice\" -Method POST -Body $b -ContentType \"application/json\" -UseBasicParsing -TimeoutSec 15; \\($r.Content | ConvertFrom-Json\\).response)",
+      "PowerShell($b = '{\"text\":\"999733\",\"session_id\":\"otp-test-clean\",\"caller_phone\":\"\"}'; $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/voice\" -Method POST -Body $b -ContentType \"application/json\" -UseBasicParsing -TimeoutSec 10; $d = $r.Content | ConvertFrom-Json; Write-Host \"Response  :\" $d.response; Write-Host \"Conv state:\" $d.conv_state)",
+      "PowerShell(Start-Sleep -Seconds 2; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/health\" -UseBasicParsing -TimeoutSec 5; Write-Host \"Status: $\\($r.StatusCode\\)\" } catch { Write-Host \"Not ready yet: $_\" })",
+      "PowerShell(cd \"D:\\\\phonely project\\\\phonely-airline\"; Start-Process -FilePath \"python\" -ArgumentList \"-m\", \"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\", \"--reload\" -WindowStyle Hidden; Start-Sleep -Seconds 4; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/health\" -UseBasicParsing -TimeoutSec 5; Write-Host \"Server up: $\\($r.StatusCode\\)\" } catch { Write-Host \"Not ready: $_\" })",
+      "PowerShell(Start-Sleep -Seconds 5; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/health\" -UseBasicParsing -TimeoutSec 8; Write-Host \"Backend: $\\($r.StatusCode\\) OK\" } catch { Write-Host \"Backend not ready: $_\" })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/app/index.html\" -UseBasicParsing -TimeoutSec 5; Write-Host \"Frontend: $\\($r.StatusCode\\) OK\" } catch { Write-Host \"Frontend error: $_\" })"
+    ]
+  }
+}

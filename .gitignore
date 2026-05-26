@@ -1,0 +1,44 @@
+# Environment variables — never commit API keys
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Database (regenerated on startup)
+*.db
+*.sqlite
+*.sqlite3
+
+# ChromaDB vector store (regenerated on startup)
+chromadb_store/
+
+# Logs
+*.log
+server_out.txt
+server_err.log
+server_out.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Backup zips
+*.zip

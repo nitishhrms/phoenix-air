@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phoenix Air — Booking Agent</title>
+  <style>
+    :root {
+      --bg:          #F5F5F7;
+      --sidebar-bg:  #1D1D1F;
+      --card:        #FFFFFF;
+      --blue:        #0071E3;
+      --blue-hover:  #0077ED;
+      --green:       #30D158;
+      --red:         #FF3B30;
+      --text-1:      #1D1D1F;
+      --text-2:      #6E6E73;
+      --text-3:      #86868B;
+      --border:      rgba(0,0,0,0.08);
+      --font:        -apple-system, BlinkMacSystemFont, "SF Pro Display",
+                     "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    /* ── Modal overlay ──────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999;
+      animation: fadeIn .2s ease;
+    }
+    .modal-overlay.hidden { display: none; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px;
+      width: min(400px, calc(100vw - 48px));
+      box-shadow: 0 40px 100px rgba(0,0,0,.25);
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal-logo {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+    }
+    .modal-logo-icon {
+      width: 36px; height: 36px;
+      background: var(--blue);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #fff;
+    }
+    .modal-logo-name { font-size: 18px; font-weight: 700; color: var(--text-1); }
+    .modal-sub { font-size: 13px; color: var(--text-3); margin-bottom: 24px; }
+
+    .tab-row {
+      display: flex;
+      border-bottom: 1.5px solid var(--border);
+      margin-bottom: 22px;
+      gap: 0;
+    }
+    .tab-btn {
+      flex: 1;
+      border: none;
+      background: none;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-3);
+      padding: 8px 0 10px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1.5px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .form-group { margin-bottom: 14px; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 5px; display: block; }
+    .form-input {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 13px;
+      font-size: 14px;
+      font-family: var(--font);
+      color: var(--text-1);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .form-input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(0,113,227,.12);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .modal-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      font-family: var(--font);
+      font-size: 14.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      margin-top: 4px;
+    }
+    .modal-btn-primary { background: var(--blue); color: #fff; }
+    .modal-btn-primary:hover { background: var(--blue-hover); transform: scale(1.01); }
+    .modal-btn-ghost {
+      background: transparent;
+      color: var(--text-3);
+      font-weight: 400;
+      font-size: 13px;
+      margin-top: 10px;
+      padding: 8px;
+    }
+    .modal-btn-ghost:hover { color: var(--text-1); }
+    .modal-error {
+      font-size: 12.5px;
+      color: var(--red);
+      margin-top: 10px;
+      min-height: 18px;
+    }
+
+    /* ── Main window ─────────────────────────────────────────────── */
+    .window {
+      display: flex;
+      width: min(1020px, 100%);
+      height: min(720px, calc(100vh - 48px));
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow:
+        0 40px 100px rgba(0,0,0,.18),
+        0  4px  16px rgba(0,0,0,.08);
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    .sidebar {
+      width: 264px;
+      flex-shrink: 0;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 22px;
+      overflow: hidden;
+      position: relative;
+    }
+    .sidebar::after {
+      content: '';
+      position: absolute;
+      top: -80px; right: -80px;
+      width: 260px; height: 260px;
+      background: radial-gradient(circle, rgba(0,113,227,.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .brand { display: flex; align-items: center; gap: 11px; margin-bottom: 6px; }
+    .brand-icon {
+      width: 34px; height: 34px;
+      background: var(--blue);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+    }
+    .brand-name { color: #fff; font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
+    .brand-sub { color: rgba(255,255,255,.35); font-size: 11.5px; letter-spacing: .1px; margin-bottom: 24px; }
+
+    /* User badge in sidebar */
+    .user-badge {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .user-badge.show { display: block; }
+    .user-badge-name { color: rgba(255,255,255,.85); font-size: 13px; font-weight: 600; }
+    .user-badge-sub  { color: rgba(255,255,255,.38); font-size: 11px; margin-top: 1px; }
+
+    .steps-heading {
+      color: rgba(255,255,255,.35);
+      font-size: 10.5px; font-weight: 600; letter-spacing: .9px;
+      text-transform: uppercase; margin-bottom: 14px;
+    }
+    .steps { display: flex; flex-direction: column; gap: 2px; }
+    .step { display: flex; align-items: center; gap: 11px; padding: 7px 0; transition: opacity .25s; }
+    .step.inactive { opacity: .28; }
+    .step.active   { opacity: 1; }
+    .step.done     { opacity: .6; }
+    .step-pill {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,.18);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 600;
+      color: rgba(255,255,255,.35);
+      flex-shrink: 0; transition: all .25s;
+    }
+    .step.active .step-pill {
+      background: var(--blue); border-color: var(--blue); color: #fff;
+      box-shadow: 0 0 0 4px rgba(0,113,227,.25);
+    }
+    .step.done .step-pill { background: var(--green); border-color: var(--green); color: #fff; }
+    .step-label { font-size: 13.5px; color: rgba(255,255,255,.82); letter-spacing: -.1px; }
+
+    .info-section { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+    .info-card {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 10px 13px;
+      display: none;
+      animation: fadeUp .3s ease;
+    }
+    .info-card.show { display: block; }
+    .info-label { color: rgba(255,255,255,.38); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 3px; }
+    .info-value { color: rgba(255,255,255,.9); font-size: 13.5px; font-weight: 500; }
+
+    /* ── Chat Panel ──────────────────────────────────────────────── */
+    .chat-panel { flex: 1; display: flex; flex-direction: column; background: var(--card); min-width: 0; }
+
+    .chat-header {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .chat-title { font-size: 16px; font-weight: 600; color: var(--text-1); letter-spacing: -.3px; }
+
+    .header-right { display: flex; align-items: center; gap: 8px; }
+
+    .obs-btn {
+      padding: 5px 12px;
+      border-radius: 980px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .obs-btn:hover { background: #F2F2F7; color: var(--text-1); }
+
+    .live-badge {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 500;
+      padding: 4px 10px; border-radius: 980px;
+      background: rgba(48,209,88,.12); color: #1B9E43;
+      transition: all .3s;
+    }
+    .live-badge.ended { background: rgba(255,59,48,.1); color: var(--red); }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+    .live-badge.ended .live-dot { background: var(--red); animation: none; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* Messages */
+    .messages {
+      flex: 1; overflow-y: auto;
+      padding: 22px 22px 10px;
+      display: flex; flex-direction: column; gap: 14px;
+      scroll-behavior: smooth;
+    }
+    .messages::-webkit-scrollbar { width: 0; }
+
+    .msg-row {
+      display: flex; gap: 9px;
+      max-width: 82%;
+      animation: fadeUp .22s ease;
+    }
+    .msg-row.agent { align-self: flex-start; }
+    .msg-row.user  { align-self: flex-end; flex-direction: row-reverse; }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; margin-top: 2px; font-style: normal;
+    }
+    .avatar.agent { background: #F2F2F7; color: var(--text-1); }
+    .avatar.user  { background: var(--blue); color: #fff; }
+
+    .bubble {
+      padding: 11px 15px; border-radius: 17px;
+      font-size: 14.5px; line-height: 1.55; letter-spacing: -.1px;
+      white-space: pre-line;
+    }
+    .msg-row.agent .bubble { background: #F2F2F7; color: var(--text-1); border-bottom-left-radius: 4px; }
+    .msg-row.user  .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
+
+    /* Typing */
+    .typing-row { display: flex; gap: 9px; align-self: flex-start; animation: fadeUp .22s ease; }
+    .typing-bubble { background: #F2F2F7; padding: 13px 16px; border-radius: 17px; border-bottom-left-radius: 4px; display: flex; gap: 4px; align-items: center; }
+    .t-dot { width: 6px; height: 6px; background: #C7C7CC; border-radius: 50%; animation: bounce 1.3s ease-in-out infinite; }
+    .t-dot:nth-child(2) { animation-delay: .18s; }
+    .t-dot:nth-child(3) { animation-delay: .36s; }
+    @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+
+    /* Booking confirmed card */
+    .confirm-card {
+      background: linear-gradient(145deg, #0071E3 0%, #004DAF 100%);
+      border-radius: 16px; padding: 18px 20px; color: #fff;
+      max-width: 320px; animation: fadeUp .3s ease;
+    }
+    .confirm-top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .confirm-check { width: 22px; height: 22px; background: rgba(255,255,255,.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+    .confirm-title { font-size: 14px; font-weight: 600; }
+    .confirm-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+    .confirm-key { font-size: 11.5px; opacity: .65; }
+    .confirm-val { font-size: 13px; font-weight: 500; }
+    .confirm-num { margin-top: 13px; background: rgba(255,255,255,.14); border-radius: 10px; padding: 10px 14px; text-align: center; }
+    .confirm-num-label { font-size: 10.5px; opacity: .65; margin-bottom: 3px; }
+    .confirm-num-value { font-size: 19px; font-weight: 700; letter-spacing: 2.5px; }
+    .download-btn {
+      margin-top: 12px;
+      width: 100%;
+      padding: 9px;
+      border-radius: 10px;
+      border: 1.5px solid rgba(255,255,255,.35);
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .download-btn:hover { background: rgba(255,255,255,.22); }
+
+    /* Payment card */
+    .payment-card {
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      max-width: 340px;
+      overflow: hidden;
+      animation: fadeUp .3s ease;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+    }
+    .pay-header {
+      background: linear-gradient(135deg, #1D1D1F 0%, #3a3a3c 100%);
+      padding: 14px 18px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .pay-lock { font-size: 14px; }
+    .pay-header-title { font-size: 14px; font-weight: 600; color: #fff; }
+    .pay-header-sub { font-size: 11px; color: rgba(255,255,255,.5); margin-left: auto; }
+    .pay-summary {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pay-summary-title { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); margin-bottom: 8px; }
+    .pay-flight-row { display: flex; align-items: center; justify-content: space-between; }
+    .pay-flight-info { font-size: 13px; font-weight: 500; color: var(--text-1); }
+    .pay-flight-sub { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+    .pay-total-row {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: baseline; justify-content: space-between;
+    }
+    .pay-total-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+    .pay-total-amount { font-size: 22px; font-weight: 700; color: var(--text-1); letter-spacing: -.5px; }
+    .pay-card-mock {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pay-card-mock-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); margin-bottom: 8px; }
+    .pay-card-input {
+      background: #F2F2F7;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: monospace;
+      color: var(--text-1);
+      letter-spacing: 2px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .pay-card-brand { font-size: 11px; font-weight: 700; color: var(--blue); letter-spacing: 0; font-family: var(--font); }
+    .pay-actions { padding: 12px 18px; display: flex; flex-direction: column; gap: 8px; }
+    .pay-now-btn {
+      width: 100%; padding: 11px;
+      border-radius: 10px; border: none;
+      background: var(--blue); color: #fff;
+      font-family: var(--font); font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background .15s, transform .1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .pay-now-btn:hover:not(:disabled) { background: var(--blue-hover); }
+    .pay-now-btn:active:not(:disabled) { transform: scale(.98); }
+    .pay-now-btn:disabled { background: #C7C7CC; cursor: not-allowed; }
+    .pay-cancel-btn {
+      width: 100%; padding: 10px;
+      border-radius: 10px; border: 1.5px solid var(--border);
+      background: transparent; color: var(--text-2);
+      font-family: var(--font); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: background .15s;
+    }
+    .pay-cancel-btn:hover { background: #F2F2F7; }
+    .pay-processing {
+      padding: 20px 18px; text-align: center;
+      display: none;
+    }
+    .pay-spinner {
+      width: 28px; height: 28px; margin: 0 auto 10px;
+      border: 3px solid #E5E5EA;
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pay-processing-text { font-size: 13px; color: var(--text-2); }
+
+    /* Input area */
+    .input-area {
+      padding: 14px 18px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: center; flex-shrink: 0; background: var(--card);
+    }
+    .input-wrap {
+      flex: 1; display: flex; align-items: center;
+      background: #F2F2F7; border-radius: 980px; padding: 0 16px; transition: box-shadow .2s;
+    }
+    .input-wrap:focus-within { box-shadow: 0 0 0 3px rgba(0,113,227,.2); }
+    .input-wrap input {
+      flex: 1; border: none; background: transparent; padding: 11px 0;
+      font-size: 14.5px; font-family: var(--font); color: var(--text-1); outline: none; letter-spacing: -.1px;
+    }
+    .input-wrap input::placeholder { color: var(--text-3); }
+    .input-wrap input:disabled { opacity: .5; cursor: not-allowed; }
+
+    .send-btn {
+      width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--blue);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s, transform .12s; flex-shrink: 0;
+    }
+    .send-btn:hover:not(:disabled) { background: var(--blue-hover); transform: scale(1.06); }
+    .send-btn:active:not(:disabled) { transform: scale(.95); }
+    .send-btn:disabled { background: #C7C7CC; cursor: not-allowed; }
+    .send-btn svg { width: 15px; height: 15px; fill: #fff; }
+
+    .end-notice { font-size: 12px; color: var(--text-3); text-align: center; padding: 8px 0 4px; }
+
+    /* Speaker / Mic */
+    .speaker-btn {
+      width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s; flex-shrink: 0;
+    }
+    .speaker-btn:hover { background: rgba(0,0,0,.05); }
+    .speaker-btn svg { width: 17px; height: 17px; fill: var(--text-2); }
+    .speaker-btn.muted svg { fill: #C7C7CC; }
+
+    .mic-btn {
+      width: 38px; height: 38px; border-radius: 50%; border: none; background: #F2F2F7;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s, transform .12s; flex-shrink: 0;
+    }
+    .mic-btn:hover:not(:disabled):not(.recording) { background: #E5E5EA; transform: scale(1.06); }
+    .mic-btn:active:not(:disabled) { transform: scale(.95); }
+    .mic-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .mic-btn svg { width: 16px; height: 16px; fill: var(--text-2); transition: fill .15s; }
+    .mic-btn.recording { background: var(--red); animation: mic-pulse 1.4s ease-in-out infinite; }
+    .mic-btn.recording svg { fill: #fff; }
+    @keyframes mic-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,59,48,.4); } 50% { box-shadow: 0 0 0 8px rgba(255,59,48,0); } }
+
+    /* Suggestion chips */
+    .chips-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 0 4px 37px; animation: fadeUp .22s ease; }
+    .chip-btn {
+      background: rgba(0,113,227,.08); border: 1.5px solid rgba(0,113,227,.22);
+      color: var(--blue); border-radius: 980px; padding: 6px 14px;
+      font-size: 13px; font-weight: 500; font-family: var(--font);
+      cursor: pointer; transition: background .15s, transform .12s; letter-spacing: -.1px;
+    }
+    .chip-btn:hover { background: rgba(0,113,227,.14); transform: scale(1.03); }
+
+    /* Flight cards */
+    .flights-wrapper { padding: 0 0 4px 37px; animation: fadeUp .22s ease; }
+    .sort-bar { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+    .sort-label { font-size: 11.5px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+    .sort-btn {
+      background: #F2F2F7; border: 1.5px solid transparent; color: var(--text-2);
+      border-radius: 980px; padding: 4px 12px; font-size: 12.5px; font-weight: 500;
+      font-family: var(--font); cursor: pointer; transition: all .15s;
+    }
+    .sort-btn.active { background: rgba(0,113,227,.1); border-color: rgba(0,113,227,.3); color: var(--blue); }
+    .sort-btn:hover:not(.active) { background: #E5E5EA; }
+    .filter-toggle {
+      background: #F2F2F7; border: 1.5px solid transparent; color: var(--text-2);
+      border-radius: 980px; padding: 4px 12px; font-size: 12.5px; font-weight: 500;
+      font-family: var(--font); cursor: pointer; transition: all .15s; margin-left: 4px;
+    }
+    .filter-toggle.active { background: rgba(48,209,88,.12); border-color: rgba(48,209,88,.4); color: #1a8a3a; }
+    .filter-toggle:hover:not(.active) { background: #E5E5EA; }
+    .no-results { font-size: 13px; color: var(--text-3); padding: 12px 0; text-align: center; }
+
+    .flight-cards { display: flex; flex-direction: column; gap: 8px; }
+    .flight-card {
+      background: var(--card); border: 1.5px solid var(--border); border-radius: 14px;
+      padding: 13px 15px; display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; transition: border-color .15s, box-shadow .15s; cursor: pointer;
+      position: relative; overflow: hidden;
+    }
+    .flight-card:hover { border-color: rgba(0,113,227,.35); box-shadow: 0 2px 12px rgba(0,113,227,.1); }
+    .flight-card.recommended { border-color: rgba(0,113,227,.4); background: linear-gradient(135deg, rgba(0,113,227,.03) 0%, #fff 100%); }
+
+    .top-pick-badge {
+      position: absolute; top: 0; left: 0;
+      background: var(--blue); color: #fff; font-size: 9.5px; font-weight: 700;
+      letter-spacing: .5px; padding: 3px 9px; border-bottom-right-radius: 8px; text-transform: uppercase;
+    }
+    .cheapest-badge {
+      position: absolute; top: 0; left: 0;
+      background: var(--green); color: #fff; font-size: 9.5px; font-weight: 700;
+      letter-spacing: .5px; padding: 3px 9px; border-bottom-right-radius: 8px; text-transform: uppercase;
+    }
+    .fastest-badge {
+      position: absolute; top: 0; left: 0;
+      background: #FF9500; color: #fff; font-size: 9.5px; font-weight: 700;
+      letter-spacing: .5px; padding: 3px 9px; border-bottom-right-radius: 8px; text-transform: uppercase;
+    }
+
+    .flight-info { flex: 1; min-width: 0; }
+    .flight-airline { font-size: 13.5px; font-weight: 600; color: var(--text-1); letter-spacing: -.2px; margin-top: 4px; }
+    .flight-times { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; color: var(--text-2); }
+    .flight-time-sep { width: 24px; height: 1px; background: var(--border); position: relative; }
+    .flight-time-sep::after { content: '›'; position: absolute; right: -4px; top: -9px; font-size: 12px; color: var(--text-3); }
+    .flight-duration { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+    .flight-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+    .flight-price { font-size: 17px; font-weight: 700; color: var(--text-1); letter-spacing: -.4px; }
+    .select-btn {
+      background: var(--blue); color: #fff; border: none; border-radius: 980px;
+      padding: 5px 14px; font-size: 12.5px; font-weight: 600; font-family: var(--font);
+      cursor: pointer; transition: background .15s, transform .12s; white-space: nowrap;
+    }
+    .select-btn:hover { background: var(--blue-hover); transform: scale(1.04); }
+    .select-btn:active { transform: scale(.96); }
+    .flight-date-header { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .8px; padding: 6px 0 4px; }
+
+    /* Observability modal */
+    .obs-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 998; animation: fadeIn .2s ease;
+    }
+    .obs-modal.hidden { display: none; }
+    .obs-box {
+      background: #fff; border-radius: 20px;
+      width: min(700px, calc(100vw - 32px));
+      max-height: 75vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 40px 100px rgba(0,0,0,.25);
+      overflow: hidden;
+    }
+    .obs-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .obs-title { font-size: 16px; font-weight: 700; color: var(--text-1); }
+    .obs-close { border: none; background: none; font-size: 20px; cursor: pointer; color: var(--text-3); line-height: 1; }
+    .obs-close:hover { color: var(--text-1); }
+    .obs-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .obs-stat { text-align: center; }
+    .obs-stat-val { font-size: 22px; font-weight: 700; color: var(--blue); }
+    .obs-stat-lbl { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+    .obs-table-wrap { overflow-y: auto; padding: 16px 24px; }
+    .obs-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .obs-table th { text-align: left; color: var(--text-3); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .5px; font-size: 10.5px; }
+    .obs-table td { padding: 8px; border-bottom: 1px solid rgba(0,0,0,.04); vertical-align: top; color: var(--text-1); }
+    .obs-table tr:hover td { background: #F9F9FB; }
+    .score-badge { display: inline-block; padding: 2px 7px; border-radius: 980px; font-size: 11px; font-weight: 600; }
+    .score-5 { background: rgba(48,209,88,.15); color: #1B9E43; }
+    .score-4 { background: rgba(48,209,88,.08); color: #30A152; }
+    .score-3 { background: rgba(255,149,0,.12); color: #C47800; }
+    .score-2,.score-1 { background: rgba(255,59,48,.1); color: var(--red); }
+    .safety-pass { color: var(--green); font-weight: 600; }
+    .safety-fail { color: var(--red); font-weight: 600; }
+
+    /* ── Language flashcards ─────────────────────────────────────── */
+    .lang-cards-wrap {
+      padding: 4px 0 4px 37px;
+      animation: fadeUp .25s ease;
+    }
+    .lang-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      max-width: 480px;
+    }
+    .lang-card {
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 8px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s, transform .12s;
+      text-align: center;
+      font-family: var(--font);
+    }
+    .lang-card:hover {
+      border-color: rgba(0,113,227,.5);
+      box-shadow: 0 4px 16px rgba(0,113,227,.12);
+      transform: translateY(-2px);
+    }
+    .lang-card:active { transform: translateY(0) scale(.97); }
+    .lang-card-flag { font-size: 26px; line-height: 1; }
+    .lang-card-native { font-size: 13px; font-weight: 600; color: var(--text-1); }
+    .lang-card-eng { font-size: 10.5px; color: var(--text-3); font-weight: 500; }
+  </style>
+</head>
+<body>
+
+<!-- ── Login / Signup Modal ────────────────────────────────────── -->
+<div class="modal-overlay" id="auth-modal">
+  <div class="modal-box">
+    <div class="modal-logo">
+      <div class="modal-logo-icon">&#9992;</div>
+      <span class="modal-logo-name">Phoenix Air</span>
+    </div>
+    <div class="modal-sub">Sign in to save your bookings &amp; get personalised service</div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+      <button class="tab-btn"        onclick="switchTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- Login form -->
+    <div id="login-form">
+      <div class="form-group">
+        <label class="form-label">Phone or Email</label>
+        <input class="form-input" id="l-identifier" type="text" placeholder="+1 408 555 0100" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="l-password" type="password" placeholder="••••••••" />
+      </div>
+      <button class="modal-btn modal-btn-primary" onclick="doLogin()">Login</button>
+      <div class="modal-error" id="login-error"></div>
+    </div>
+
+    <!-- Signup form -->
+    <div id="signup-form" style="display:none;">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          <input class="form-input" id="s-first" type="text" placeholder="Jane" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          <input class="form-input" id="s-last" type="text" placeholder="Doe" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input class="form-input" id="s-phone" type="tel" placeholder="+14085550100" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email (optional)</label>
+        <input class="form-input" id="s-email" type="email" placeholder="jane@example.com" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="s-password" type="password" placeholder="Choose a password" />
+      </div>
+      <button class="modal-btn modal-btn-primary" onclick="doSignup()">Create Account</button>
+      <div class="modal-error" id="signup-error"></div>
+    </div>
+
+    <button class="modal-btn modal-btn-ghost" onclick="guestMode()">Continue without login →</button>
+  </div>
+</div>
+
+<!-- ── Observability Modal ─────────────────────────────────────── -->
+<div class="obs-modal hidden" id="obs-modal">
+  <div class="obs-box">
+    <div class="obs-header">
+      <span class="obs-title">LLM as Judge — Observability</span>
+      <button class="obs-close" onclick="closeObs()">&#x2715;</button>
+    </div>
+    <div class="obs-stats" id="obs-stats"></div>
+    <div class="obs-table-wrap">
+      <table class="obs-table">
+        <thead>
+          <tr>
+            <th>Node</th>
+            <th>User said</th>
+            <th>Rel</th><th>Acc</th><th>Help</th><th>Safety</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="obs-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main window ─────────────────────────────────────────────── -->
+<div class="window">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">&#9992;</div>
+      <span class="brand-name">Phoenix Air</span>
+    </div>
+    <div class="brand-sub">AI Booking Assistant</div>
+
+    <div class="user-badge" id="user-badge">
+      <div class="user-badge-name" id="user-badge-name">Guest</div>
+      <div class="user-badge-sub">Logged in</div>
+    </div>
+
+    <div class="steps-heading">Booking Steps</div>
+    <div class="steps">
+      <div class="step inactive" id="s0">
+        <div class="step-pill">&#127760;</div>
+        <span class="step-label">Language</span>
+      </div>
+      <div class="step inactive" id="s1">
+        <div class="step-pill">1</div>
+        <span class="step-label">Verify Phone</span>
+      </div>
+      <div class="step inactive" id="s2">
+        <div class="step-pill">2</div>
+        <span class="step-label">Destination</span>
+      </div>
+      <div class="step inactive" id="s3">
+        <div class="step-pill">3</div>
+        <span class="step-label">Travel Date</span>
+      </div>
+      <div class="step inactive" id="s4">
+        <div class="step-pill">4</div>
+        <span class="step-label">Select Flight</span>
+      </div>
+      <div class="step inactive" id="s5">
+        <div class="step-pill">5</div>
+        <span class="step-label">Passenger</span>
+      </div>
+      <div class="step inactive" id="s6">
+        <div class="step-pill">6</div>
+        <span class="step-label">Contact</span>
+      </div>
+      <div class="step inactive" id="s7">
+        <div class="step-pill">&#10003;</div>
+        <span class="step-label">Confirmed</span>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <div class="info-card" id="ic-lang">
+        <div class="info-label">Language</div>
+        <div class="info-value" id="iv-lang">English</div>
+      </div>
+      <div class="info-card" id="ic-route">
+        <div class="info-label">Route</div>
+        <div class="info-value" id="iv-route">—</div>
+      </div>
+      <div class="info-card" id="ic-date">
+        <div class="info-label">Date</div>
+        <div class="info-value" id="iv-date">—</div>
+      </div>
+      <div class="info-card" id="ic-pax">
+        <div class="info-label">Passenger</div>
+        <div class="info-value" id="iv-pax">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Panel -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <span class="chat-title">Flight Booking</span>
+      <div class="header-right">
+        <button class="speaker-btn" id="speaker-btn" title="Toggle voice">
+          <svg id="speaker-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        </button>
+        <button class="obs-btn" onclick="openObs()">&#128202; Observability</button>
+        <div class="live-badge" id="badge">
+          <div class="live-dot"></div>
+          <span id="badge-text">Live</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="input-area">
+      <div class="input-wrap">
+        <input type="text" id="txt" placeholder="Type your message..." autocomplete="off" autofocus />
+      </div>
+      <button class="mic-btn" id="mic-btn" title="Speak">
+        <svg viewBox="0 0 24 24"><path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 18.93V22h2v-2.07A8.001 8.001 0 0 0 20 12h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/></svg>
+      </button>
+      <button class="send-btn" id="send-btn" onclick="send()">
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API       = '/api/voice';
+  const sessionId = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36));
+  let   busy      = false;
+  let   ended     = false;
+  let   info      = { from: null, to: null, date: null, pax: null };
+  let   loggedInUser = null;  // { user_id, first_name, last_name, phone }
+  let   ttsLang   = 'en-US';
+  let   lastConf  = null;     // last confirmation number for download
+
+  const $msgs   = document.getElementById('messages');
+  const $txt    = document.getElementById('txt');
+  const $send   = document.getElementById('send-btn');
+  const $badge  = document.getElementById('badge');
+
+  /* ── Step mapping ──────────────────────────────────────────────── */
+  const STATE_STEP = {
+    SELECTING_LANGUAGE: 0,
+    IDLE: 0, COLLECTING_PHONE: 1, VERIFYING_OTP: 1,
+    COLLECTING_DEPARTURE: 2, COLLECTING_DESTINATION: 2,
+    COLLECTING_DATE: 3, PRESENTING_FLIGHTS: 4,
+    COLLECTING_PASSENGER: 5, COLLECTING_CONTACT: 6,
+    COLLECTING_PAYMENT: 6,
+    BOOKING_CONFIRMED: 7, DONE: 7,
+  };
+
+  const LANG_NAMES = {
+    en:'English', es:'Español', fr:'Français', hi:'हिंदी',
+    zh:'中文', ar:'العربية', pt:'Português', de:'Deutsch',
+  };
+  const LANG_TTS = {
+    en:'en-US', es:'es-ES', fr:'fr-FR', hi:'hi-IN',
+    zh:'zh-CN', ar:'ar-SA', pt:'pt-BR', de:'de-DE',
+  };
+
+  let currentFlights = [];
+  let currentSort    = 'recommended';
+
+  function setSteps(convState) {
+    const cur = STATE_STEP[convState] ?? 0;
+    for (let i = 0; i <= 7; i++) {
+      const el   = document.getElementById(`s${i}`);
+      if (!el) continue;
+      const pill = el.querySelector('.step-pill');
+      if (i < cur)        { el.className = 'step done';     if (i > 0) pill.textContent = '✓'; }
+      else if (i === cur) { el.className = 'step active';   if (i > 0 && i < 7) pill.textContent = i; }
+      else                { el.className = 'step inactive'; if (i > 0 && i < 7) pill.textContent = i; }
+    }
+  }
+
+  function updateCards(data) {
+    // Use structured API fields (reliable) with text regex as fallback
+    const dep  = data.departure_iata  || data.departure_city  || null;
+    const dst  = data.destination_iata|| data.destination_city|| null;
+    const date = data.travel_date || null;
+    const pax  = data.passenger_name  || null;
+
+    if (dep)  info.from = dep;
+    if (dst)  info.to   = dst;
+    if (date) info.date = date;
+    if (pax)  info.pax  = pax;
+
+    // Fallback: parse text for date if API didn't send it
+    if (!info.date) {
+      const dateM = data.response.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+      if (dateM) info.date = dateM[1];
+    }
+
+    if (info.from || info.to) {
+      document.getElementById('ic-route').classList.add('show');
+      document.getElementById('iv-route').textContent = (info.from||'?') + ' → ' + (info.to||'?');
+    }
+    if (info.date) {
+      document.getElementById('ic-date').classList.add('show');
+      document.getElementById('iv-date').textContent = info.date;
+    }
+    if (info.pax && info.pax.trim()) {
+      document.getElementById('ic-pax').classList.add('show');
+      document.getElementById('iv-pax').textContent = info.pax;
+    }
+    if (data.conv_state === 'COLLECTING_PHONE') {
+      detectLangFromText(data.response);
+    }
+  }
+
+  function detectLangFromText(text) {
+    for (const [code, name] of Object.entries(LANG_NAMES)) {
+      if (text.includes(name) || text.includes(code.toUpperCase())) {
+        setLanguage(code); return;
+      }
+    }
+  }
+
+  function setLanguage(code) {
+    ttsLang = LANG_TTS[code] || 'en-US';
+    document.getElementById('ic-lang').classList.add('show');
+    document.getElementById('iv-lang').textContent = LANG_NAMES[code] || code;
+  }
+
+  /* ── Helpers ────────────────────────────────────────────────────── */
+  function scroll() { setTimeout(() => { $msgs.scrollTop = $msgs.scrollHeight; }, 40); }
+
+  function avatar(role) {
+    const a = document.createElement('div');
+    a.className = `avatar ${role}`;
+    a.textContent = role === 'agent' ? '✈' : '↑';
+    return a;
+  }
+
+  function addMsg(role, text) {
+    const row = document.createElement('div');
+    row.className = `msg-row ${role}`;
+    const bub = document.createElement('div');
+    bub.className = 'bubble';
+    bub.textContent = text;
+    row.appendChild(avatar(role));
+    row.appendChild(bub);
+    $msgs.appendChild(row);
+    scroll();
+  }
+
+  function addConfirmCard(confNum) {
+    lastConf = confNum;
+    const card = document.createElement('div');
+    card.className = 'confirm-card';
+    card.innerHTML = `
+      <div class="confirm-top">
+        <div class="confirm-check">&#10003;</div>
+        <div class="confirm-title">Booking Confirmed</div>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-key">Route</span>
+        <span class="confirm-val">${info.from||'?'} &rarr; ${info.to||'?'}</span>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-key">Date</span>
+        <span class="confirm-val">${info.date||'—'}</span>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-key">Passenger</span>
+        <span class="confirm-val">${info.pax||'—'}</span>
+      </div>
+      <div class="confirm-num">
+        <div class="confirm-num-label">Confirmation Number</div>
+        <div class="confirm-num-value">${confNum}</div>
+      </div>
+      <button class="download-btn" onclick="downloadTicket('${confNum}')">&#8681; Download Ticket PDF</button>`;
+    const row = document.createElement('div');
+    row.className = 'msg-row agent';
+    row.appendChild(card);
+    $msgs.appendChild(row);
+    scroll();
+  }
+
+  function downloadTicket(conf) {
+    window.open(`/api/ticket/${conf}`, '_blank');
+  }
+
+  function addPaymentCard(price, airline, flightNum) {
+    const priceStr = price > 0 ? `$${price.toFixed(2)}` : '';
+    const flightLabel = (airline && flightNum) ? `${airline} ${flightNum}` : (airline || flightNum || 'Your flight');
+    const routeLabel  = (info.from && info.to) ? `${info.from} → ${info.to}` : '';
+    const card = document.createElement('div');
+    card.className = 'payment-card';
+    card.id = 'payment-card';
+    card.innerHTML = `
+      <div class="pay-header">
+        <span class="pay-lock">🔒</span>
+        <span class="pay-header-title">Secure Checkout</span>
+        <span class="pay-header-sub">Phoenix Air</span>
+      </div>
+      <div class="pay-summary">
+        <div class="pay-summary-title">Order Summary</div>
+        <div class="pay-flight-row">
+          <div>
+            <div class="pay-flight-info">${flightLabel}</div>
+            ${routeLabel ? `<div class="pay-flight-sub">${routeLabel}${info.date ? '  ·  ' + info.date : ''}</div>` : ''}
+          </div>
+          ${priceStr ? `<div style="font-size:14px;font-weight:600;color:var(--text-1)">${priceStr}</div>` : ''}
+        </div>
+      </div>
+      ${priceStr ? `<div class="pay-total-row"><span class="pay-total-label">Total due today</span><span class="pay-total-amount">${priceStr}</span></div>` : ''}
+      <div class="pay-card-mock">
+        <div class="pay-card-mock-label">Payment Method</div>
+        <div class="pay-card-input">
+          <span>•••• •••• •••• 4242</span>
+          <span class="pay-card-brand">VISA</span>
+        </div>
+      </div>
+      <div class="pay-actions" id="pay-actions">
+        <button class="pay-now-btn" id="pay-now-btn" onclick="confirmPayment()">
+          <span>Confirm &amp; Pay${priceStr ? ' ' + priceStr : ''}</span>
+        </button>
+        <button class="pay-cancel-btn" onclick="cancelPayment()">Cancel</button>
+      </div>
+      <div class="pay-processing" id="pay-processing">
+        <div class="pay-spinner"></div>
+        <div class="pay-processing-text">Processing payment…</div>
+      </div>`;
+    const row = document.createElement('div');
+    row.className = 'msg-row agent';
+    row.appendChild(card);
+    $msgs.appendChild(row);
+    scroll();
+  }
+
+  function confirmPayment() {
+    const btn = document.getElementById('pay-now-btn');
+    const actions = document.getElementById('pay-actions');
+    const processing = document.getElementById('pay-processing');
+    if (btn) btn.disabled = true;
+    if (actions) actions.style.display = 'none';
+    if (processing) processing.style.display = 'block';
+    scroll();
+    send('yes');
+  }
+
+  function cancelPayment() {
+    const card = document.getElementById('payment-card');
+    if (card) card.closest('.msg-row').remove();
+    send('no');
+  }
+
+  function showTyping() {
+    const row = document.createElement('div');
+    row.id = 'typing'; row.className = 'typing-row';
+    row.innerHTML = `<div class="avatar agent">&#9992;</div><div class="typing-bubble"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div>`;
+    $msgs.appendChild(row); scroll();
+  }
+  function hideTyping() { const el = document.getElementById('typing'); if (el) el.remove(); }
+
+  function getConf(text, apiField) {
+    if (apiField) return apiField;
+    const m = text.match(/\b(PHN-[A-Z0-9]{4,}|CONF\d{4,})\b/);
+    return m ? m[0] : null;
+  }
+
+  function markEnded() {
+    ended = true;
+    $send.disabled = true; $txt.disabled = true;
+    $txt.placeholder = 'Session ended';
+    $badge.classList.add('ended');
+    document.getElementById('badge-text').textContent = 'Ended';
+    const note = document.createElement('div');
+    note.className = 'end-notice';
+    note.textContent = 'This booking session has ended.';
+    if (lastConf) {
+      const dl = document.createElement('div');
+      dl.className = 'end-notice';
+      dl.innerHTML = `<a href="/api/ticket/${lastConf}" target="_blank" style="color:var(--blue);text-decoration:none;font-weight:600;">&#8681; Download your ticket</a>`;
+      $msgs.appendChild(dl);
+    }
+    $msgs.appendChild(note);
+    scroll();
+  }
+
+  /* ── Flight cards ─────────────────────────────────────────────── */
+  function fmtTime(iso) {
+    try { const d = new Date(iso); return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
+    catch { return iso; }
+  }
+  function fmtDuration(mins) {
+    const h = Math.floor(mins/60), m = mins%60; return h ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  let nonstopOnly = false;
+
+  function sortFlights(flights, sortBy) {
+    const copy = [...flights];
+    if (sortBy === 'price') copy.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+    else if (sortBy === 'time') copy.sort((a, b) => (a.durationMinutes||999) - (b.durationMinutes||999));
+    return copy;
+  }
+
+  function renderFlightCards(flights, sortBy) {
+    const wrapper = document.getElementById('flight-cards-wrapper');
+    if (!wrapper) return;
+
+    let filtered = nonstopOnly ? flights.filter(f => f.stops === 0) : [...flights];
+    const sorted  = sortFlights(filtered, sortBy);
+
+    const byDate = {};
+    sorted.forEach(f => { const d = f.travelDate||''; if (!byDate[d]) byDate[d]=[]; byDate[d].push(f); });
+    const cardList = wrapper.querySelector('.flight-cards');
+    cardList.innerHTML = '';
+
+    if (sorted.length === 0) {
+      cardList.innerHTML = '<div class="no-results">No flights match your filters.</div>';
+    } else {
+      const dates = Object.keys(byDate);
+      dates.forEach(date => {
+        if (date && dates.length > 1) {
+          const header = document.createElement('div');
+          header.className = 'flight-date-header';
+          header.textContent = date;
+          cardList.appendChild(header);
+        }
+        byDate[date].forEach((f, idx) => {
+          const globalIdx = flights.indexOf(f);
+          const optionNum = (globalIdx >= 0 ? globalIdx : idx) + 1;
+          const card = document.createElement('div');
+          card.className = 'flight-card' + (f.recommended && sortBy === 'recommended' ? ' recommended' : '');
+
+          const dep   = fmtTime(f.departureTime);
+          const arr   = fmtTime(f.arrivalTime);
+          const dur   = fmtDuration(f.durationMinutes||0);
+          const stops = f.stops === 0 ? 'Nonstop' : `${f.stops} stop${f.stops>1?'s':''}`;
+
+          let badge = '';
+          if (sortBy === 'recommended') {
+            if (f.best_value) badge = '<div class="top-pick-badge">Best Value</div>';
+            else if (f.cheapest) badge = '<div class="cheapest-badge">Cheapest</div>';
+            else if (f.fastest)  badge = '<div class="fastest-badge">Fastest</div>';
+          }
+
+          card.innerHTML = `
+            ${badge}
+            <div class="flight-info">
+              <div class="flight-airline">${f.airline} · ${f.flightNumber}</div>
+              <div class="flight-times">
+                <span>${dep}</span><div class="flight-time-sep"></div><span>${arr}</span>
+              </div>
+              <div class="flight-duration">${dur} · ${stops}</div>
+            </div>
+            <div class="flight-right">
+              <div class="flight-price">$${parseFloat(f.price).toFixed(2)}</div>
+            </div>`;
+
+          const selectBtn = document.createElement('button');
+          selectBtn.className = 'select-btn';
+          selectBtn.textContent = 'Select';
+          selectBtn.addEventListener('click', () => selectFlight(optionNum));
+          card.querySelector('.flight-right').appendChild(selectBtn);
+
+          cardList.appendChild(card);
+        });
+      });
+    }
+
+    wrapper.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.sort === sortBy);
+    });
+    const nonstopBtn = wrapper.querySelector('.filter-toggle[data-filter="nonstop"]');
+    if (nonstopBtn) nonstopBtn.classList.toggle('active', nonstopOnly);
+    scroll();
+  }
+
+  function addFlightCards(flights) {
+    currentFlights = flights;
+    currentSort    = 'recommended';
+    nonstopOnly    = false;
+    const existing = document.getElementById('flight-cards-wrapper');
+    if (existing) existing.remove();
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'flight-cards-wrapper';
+    wrapper.className = 'flights-wrapper';
+
+    // Sort bar
+    const sortBar = document.createElement('div');
+    sortBar.className = 'sort-bar';
+
+    const sortLabel = document.createElement('span');
+    sortLabel.className = 'sort-label';
+    sortLabel.textContent = 'Sort';
+    sortBar.appendChild(sortLabel);
+
+    [
+      { key: 'recommended', label: 'Best Value' },
+      { key: 'price',       label: 'Price ↑' },
+      { key: 'time',        label: 'Fastest' },
+    ].forEach(({ key, label }) => {
+      const btn = document.createElement('button');
+      btn.className = 'sort-btn' + (key === 'recommended' ? ' active' : '');
+      btn.dataset.sort = key;
+      btn.textContent  = label;
+      btn.addEventListener('click', () => { currentSort = key; renderFlightCards(currentFlights, key); });
+      sortBar.appendChild(btn);
+    });
+
+    // Nonstop toggle
+    const nonstopBtn = document.createElement('button');
+    nonstopBtn.className = 'filter-toggle';
+    nonstopBtn.dataset.filter = 'nonstop';
+    nonstopBtn.textContent = 'Nonstop';
+    nonstopBtn.addEventListener('click', () => {
+      nonstopOnly = !nonstopOnly;
+      renderFlightCards(currentFlights, currentSort);
+    });
+    sortBar.appendChild(nonstopBtn);
+
+    const cardList = document.createElement('div');
+    cardList.className = 'flight-cards';
+
+    wrapper.appendChild(sortBar);
+    wrapper.appendChild(cardList);
+    $msgs.appendChild(wrapper);
+    renderFlightCards(flights, 'recommended');
+  }
+
+  function changeSort(sortBy) {
+    currentSort = sortBy;
+    renderFlightCards(currentFlights, sortBy);
+  }
+
+  function selectFlight(optionNum) {
+    const wrapper = document.getElementById('flight-cards-wrapper');
+    if (wrapper) wrapper.remove();
+    const f = currentFlights[optionNum - 1];
+    const label = f
+      ? `${f.airline} ${f.flightNumber} — $${parseFloat(f.price).toFixed(2)}`
+      : `Flight ${optionNum}`;
+    send(String(optionNum), label);
+  }
+
+  /* ── Language flashcards ─────────────────────────────────────── */
+  const LANG_CARDS = [
+    { code:'en', flag:'🇺🇸', native:'English',  eng:'English'    },
+    { code:'es', flag:'🇪🇸', native:'Español',  eng:'Spanish'    },
+    { code:'fr', flag:'🇫🇷', native:'Français', eng:'French'     },
+    { code:'hi', flag:'🇮🇳', native:'हिंदी',    eng:'Hindi'      },
+    { code:'zh', flag:'🇨🇳', native:'中文',      eng:'Chinese'    },
+    { code:'ar', flag:'🇸🇦', native:'العربية',  eng:'Arabic'     },
+    { code:'pt', flag:'🇧🇷', native:'Português',eng:'Portuguese' },
+    { code:'de', flag:'🇩🇪', native:'Deutsch',  eng:'German'     },
+  ];
+
+  function addLanguageCards() {
+    const existing = document.getElementById('lang-cards-wrap');
+    if (existing) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'lang-cards-wrap';
+    wrap.className = 'lang-cards-wrap';
+    const grid = document.createElement('div');
+    grid.className = 'lang-cards';
+    LANG_CARDS.forEach((l, i) => {
+      const card = document.createElement('button');
+      card.className = 'lang-card';
+      card.innerHTML = `
+        <span class="lang-card-flag">${l.flag}</span>
+        <span class="lang-card-native">${l.native}</span>
+        <span class="lang-card-eng">${l.eng}</span>`;
+      card.onclick = () => {
+        wrap.remove();
+        send(String(i + 1), `${l.flag} ${l.native}`);
+      };
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+    $msgs.appendChild(wrap);
+    scroll();
+  }
+
+  /* ── Suggestion chips ─────────────────────────────────────────── */
+  function addSuggestionChips(suggestions) {
+    const existing = document.getElementById('suggestion-chips');
+    if (existing) existing.remove();
+    if (!suggestions || suggestions.length === 0) return;
+    const row = document.createElement('div');
+    row.id = 'suggestion-chips'; row.className = 'chips-row';
+    suggestions.forEach(s => {
+      const chip = document.createElement('button');
+      chip.className = 'chip-btn';
+      chip.textContent = s.display;
+      chip.onclick = () => { row.remove(); send(s.city); };
+      row.appendChild(chip);
+    });
+    $msgs.appendChild(row);
+    scroll();
+  }
+
+  /* ── Send ───────────────────────────────────────────────────────── */
+  async function send(prefill, displayText) {
+    if (busy || ended) return;
+    const text = (prefill !== undefined) ? String(prefill).trim() : $txt.value.trim();
+    if (!text) return;
+    $txt.value = '';
+    const chips = document.getElementById('suggestion-chips');
+    if (chips) chips.remove();
+    addMsg('user', displayText || text);
+    await callAPI(text);
+  }
+
+  async function callAPI(text) {
+    busy = true; $send.disabled = true; showTyping();
+    try {
+      const body = {
+        text,
+        session_id:   sessionId,
+        caller_phone: loggedInUser?.phone || '',
+        user_id:      loggedInUser?.user_id || null,
+      };
+      const res  = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const data = await res.json();
+      hideTyping();
+
+      setSteps(data.conv_state || 'IDLE');
+      updateCards(data);
+
+      // Language selection — show flashcards
+      if (data.conv_state === 'SELECTING_LANGUAGE') {
+        addMsg('agent', data.response);
+        addLanguageCards();
+        speak(data.response);
+        addSuggestionChips(data.suggestions || []);
+        busy = false; $send.disabled = false;
+        if (!ended) $txt.focus();
+        return;
+      }
+
+      // If server re-sorted flights, update the client sort view
+      if (data.flight_sort && data.flights && data.flights.length > 0) {
+        addMsg('agent', data.response);
+        currentFlights = data.flights;
+        currentSort    = data.flight_sort;
+        renderFlightCards(currentFlights, currentSort);
+      } else if (data.conv_state === 'BOOKING_CONFIRMED' || data.conv_state === 'POST_BOOKING') {
+        const conf = getConf(data.response, data.confirmation_number);
+        conf ? addConfirmCard(conf) : addMsg('agent', data.response);
+      } else if (data.conv_state === 'COLLECTING_PAYMENT') {
+        addPaymentCard(data.flight_price || 0, data.airline || '', data.flight_number || '');
+      } else if (data.conv_state === 'PRESENTING_FLIGHTS' && data.flights && data.flights.length > 0) {
+        addMsg('agent', data.response);
+        addFlightCards(data.flights);
+      } else {
+        addMsg('agent', data.response);
+      }
+      speak(data.response);
+      addSuggestionChips(data.suggestions || []);
+
+      if (data.transfer) {
+        addMsg('agent', 'Transferring you now. Please hold.');
+        speak('Transferring you now. Please hold.');
+        markEnded();
+      } else if (data.end_call) { markEnded(); }
+    } catch {
+      hideTyping();
+      addMsg('agent', 'Connection error — make sure the server is running on port 8000.');
+    }
+    busy = false; $send.disabled = false;
+    if (!ended) $txt.focus();
+  }
+
+  $txt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+  /* ── TTS ──────────────────────────────────────────────────────── */
+  let ttsEnabled = true;
+  const $speaker = document.getElementById('speaker-btn');
+  const $speakerIcon = document.getElementById('speaker-icon');
+  const SPEAKER_ON  = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+  const SPEAKER_OFF = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+
+  function speak(text) {
+    if (!ttsEnabled || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = ttsLang; utt.rate = 1.05; utt.pitch = 1.0;
+    window.speechSynthesis.speak(utt);
+  }
+
+  if (!window.speechSynthesis) {
+    $speaker.style.display = 'none';
+  } else {
+    $speaker.addEventListener('click', () => {
+      ttsEnabled = !ttsEnabled;
+      if (!ttsEnabled) {
+        window.speechSynthesis.cancel();
+        $speaker.classList.add('muted'); $speakerIcon.innerHTML = SPEAKER_OFF; $speaker.title = 'Voice off';
+      } else {
+        $speaker.classList.remove('muted'); $speakerIcon.innerHTML = SPEAKER_ON; $speaker.title = 'Voice on';
+      }
+    });
+  }
+
+  /* ── STT ──────────────────────────────────────────────────────── */
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const $mic = document.getElementById('mic-btn');
+  if (!SpeechRec) {
+    $mic.style.display = 'none';
+  } else {
+    let recog = null, micActive = false;
+    $mic.addEventListener('click', () => {
+      if (busy || ended) return;
+      if (micActive) { recog && recog.stop(); return; }
+      recog = new SpeechRec();
+      recog.lang = ttsLang; recog.interimResults = false; recog.maxAlternatives = 1;
+      micActive = true; $mic.classList.add('recording'); $txt.placeholder = 'Listening...';
+      recog.onresult = e => { $txt.value = e.results[0][0].transcript.trim(); };
+      recog.onend = () => {
+        micActive = false; $mic.classList.remove('recording'); $txt.placeholder = 'Type your message...';
+        if ($txt.value.trim()) send();
+      };
+      recog.onerror = () => { micActive = false; $mic.classList.remove('recording'); $txt.placeholder = 'Type your message...'; };
+      recog.start();
+    });
+  }
+
+  /* ── Auth modal ───────────────────────────────────────────────── */
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0) === (tab==='login')));
+    document.getElementById('login-form').style.display  = tab === 'login'  ? '' : 'none';
+    document.getElementById('signup-form').style.display = tab === 'signup' ? '' : 'none';
+    document.getElementById('login-error').textContent   = '';
+    document.getElementById('signup-error').textContent  = '';
+  }
+
+  async function doLogin() {
+    const identifier = document.getElementById('l-identifier').value.trim();
+    const password   = document.getElementById('l-password').value;
+    if (!identifier || !password) { document.getElementById('login-error').textContent = 'Please fill all fields.'; return; }
+    try {
+      const res  = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({phone_or_email: identifier, password}) });
+      const data = await res.json();
+      if (!res.ok) { document.getElementById('login-error').textContent = data.detail || 'Login failed.'; return; }
+      onAuthSuccess(data);
+    } catch { document.getElementById('login-error').textContent = 'Network error.'; }
+  }
+
+  async function doSignup() {
+    const first    = document.getElementById('s-first').value.trim();
+    const last     = document.getElementById('s-last').value.trim();
+    const phone    = document.getElementById('s-phone').value.trim();
+    const email    = document.getElementById('s-email').value.trim();
+    const password = document.getElementById('s-password').value;
+    if (!first || !last || !phone || !password) { document.getElementById('signup-error').textContent = 'Please fill required fields.'; return; }
+    try {
+      const res  = await fetch('/api/auth/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({phone, first_name:first, last_name:last, email, password}) });
+      const data = await res.json();
+      if (!res.ok) { document.getElementById('signup-error').textContent = data.detail || 'Signup failed.'; return; }
+      // Auto-login after signup
+      const lr = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({phone_or_email:phone, password}) });
+      const ld = await lr.json();
+      if (lr.ok) onAuthSuccess(ld);
+      else { document.getElementById('signup-error').textContent = 'Account created! Please login.'; switchTab('login'); }
+    } catch { document.getElementById('signup-error').textContent = 'Network error.'; }
+  }
+
+  function onAuthSuccess(data) {
+    loggedInUser = data;
+    document.getElementById('auth-modal').classList.add('hidden');
+    const badge = document.getElementById('user-badge');
+    badge.classList.add('show');
+    document.getElementById('user-badge-name').textContent = `${data.first_name} ${data.last_name}`;
+    initChat();
+  }
+
+  function guestMode() {
+    document.getElementById('auth-modal').classList.add('hidden');
+    initChat();
+  }
+
+  /* ── Observability ────────────────────────────────────────────── */
+  async function openObs() {
+    document.getElementById('obs-modal').classList.remove('hidden');
+    try {
+      const res  = await fetch('/api/observability?limit=50');
+      const data = await res.json();
+      const stats = document.getElementById('obs-stats');
+      stats.innerHTML = `
+        <div class="obs-stat"><div class="obs-stat-val">${data.total}</div><div class="obs-stat-lbl">Total Turns</div></div>
+        <div class="obs-stat"><div class="obs-stat-val">${data.avg_relevance ?? '—'}/5</div><div class="obs-stat-lbl">Avg Relevance</div></div>
+        <div class="obs-stat"><div class="obs-stat-val">${data.avg_accuracy ?? '—'}/5</div><div class="obs-stat-lbl">Avg Accuracy</div></div>
+        <div class="obs-stat"><div class="obs-stat-val">${data.safety_pass_rate != null ? Math.round(data.safety_pass_rate*100)+'%' : '—'}</div><div class="obs-stat-lbl">Safety Pass</div></div>`;
+
+      const tbody = document.getElementById('obs-tbody');
+      tbody.innerHTML = '';
+      (data.logs || []).forEach(l => {
+        const tr = document.createElement('tr');
+        const sc = v => v != null ? `<span class="score-badge score-${v}">${v}</span>` : '—';
+        tr.innerHTML = `
+          <td><strong>${l.node_name||'?'}</strong><br><small style="color:var(--text-3)">${l.language||'en'}</small></td>
+          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(l.user_input||'').replace(/"/g,'&quot;')}">${l.user_input||'—'}</td>
+          <td>${sc(l.relevance)}</td>
+          <td>${sc(l.accuracy)}</td>
+          <td>${sc(l.helpfulness)}</td>
+          <td class="${l.safety==='pass'?'safety-pass':'safety-fail'}">${l.safety||'—'}</td>
+          <td style="max-width:160px;font-size:11.5px;color:var(--text-2)">${l.reason||'—'}</td>`;
+        tbody.appendChild(tr);
+      });
+    } catch { document.getElementById('obs-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3)">Could not load data.</td></tr>'; }
+  }
+
+  function closeObs() { document.getElementById('obs-modal').classList.add('hidden'); }
+
+  /* ── Init chat (after auth) ───────────────────────────────────── */
+  async function initChat() {
+    showTyping();
+    try {
+      const res  = await fetch(API, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text:'', session_id: sessionId, caller_phone: loggedInUser?.phone||'', user_id: loggedInUser?.user_id||null }),
+      });
+      const data = await res.json();
+      hideTyping();
+      setSteps(data.conv_state || 'SELECTING_LANGUAGE');
+      addMsg('agent', data.response);
+      speak(data.response);
+      if (data.conv_state === 'SELECTING_LANGUAGE') addLanguageCards();
+    } catch {
+      hideTyping();
+      addMsg('agent', 'Welcome to Phoenix Air! Please select your language:');
+      addLanguageCards();
+      setSteps('SELECTING_LANGUAGE');
+    }
+  }
+</script>
+
+</body>
+</html>
