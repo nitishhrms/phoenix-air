@@ -29,6 +29,10 @@ def should_continue(state: dict) -> str:
     intent     = state.get("intent", "normal")
     conv_state = state.get("conv_state", "IDLE")
 
+    # Language selection always takes priority — intent router can't handle "1"/"2"/etc.
+    if conv_state == "SELECTING_LANGUAGE":
+        return "language_selection"
+
     # Layer 1: global interruptions
     if intent == "transfer":
         return "transfer"
