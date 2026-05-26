@@ -1,14 +1,8 @@
 """
-Shared sentence-transformer singleton.
-Import get_embedder() everywhere — model loads once on first call.
+Embedding singleton — disabled on free-tier deployment (512MB RAM limit).
+All callers (intent_router, rag, resolve_airport) fall back to TF-IDF + LLM when None is returned.
 """
-
-_model = None
 
 
 def get_embedder():
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
+    return None
