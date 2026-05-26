@@ -16,4 +16,3 @@ anthropic
 # sentence-transformers removed — too heavy for 512MB Render free tier; TF-IDF + LLM fallbacks used instead
 reportlab
 ddgs
-groq

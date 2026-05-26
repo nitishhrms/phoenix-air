@@ -44,76 +44,32 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _classify_with_groq(user_input: str, context: str) -> str:
-    """
-    Primary classifier: Groq (Llama 3.1 8B) — ~100ms latency, free tier.
-    Set GROQ_API_KEY in .env to enable.
-    """
-    api_key = os.getenv("GROQ_API_KEY", "")
-    if not api_key:
-        return ""
-    try:
-        from groq import Groq
-        client = Groq(api_key=api_key)
-        result = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT + f"\n\n{context}"},
-                {"role": "user",   "content": user_input},
-            ],
-            max_tokens=5,
-            temperature=0,
-        ).choices[0].message.content.strip().lower().split()[0]
-        return result if result in ("answer", "question", "query") else ""
-    except Exception as e:
-        print(f"[CLASSIFIER] Groq error: {e}")
-        return ""
-
-
-def _classify_with_haiku(user_input: str, context: str) -> str:
-    """
-    Fallback classifier: Claude Haiku — reliable but ~600ms.
-    Used when Groq is unavailable or errors.
-    """
+def _llm_classify(user_input: str, conv_state: str, last_bot_msg: str) -> str:
+    """Classify input as answer / question / query using Claude Haiku."""
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         return "query"
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        result = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=5,
-            system=_SYSTEM_PROMPT + f"\n\n{context}",
-            messages=[{"role": "user", "content": user_input}],
-        ).content[0].text.strip().lower().split()[0]
-        return result if result in ("answer", "question", "query") else "query"
-    except Exception as e:
-        print(f"[CLASSIFIER] Haiku error: {e}")
-        return "query"
 
-
-def _llm_classify(user_input: str, conv_state: str, last_bot_msg: str) -> str:
-    """
-    Classify input as answer / question / query.
-    Tries Groq first (fast), falls back to Haiku (reliable).
-    """
     state_hint = _BOOKING_STATE_HINTS.get(conv_state, f"Current state: {conv_state}.")
     context_lines = [f"Bot state: {conv_state}.", state_hint]
     if last_bot_msg:
         context_lines.append(f"Last bot message: {last_bot_msg[:250]}")
     context = "\n".join(context_lines)
 
-    # Primary: Groq (fast small model)
-    result = _classify_with_groq(user_input, context)
-    if result:
-        print(f"[CLASSIFIER] Groq: {result}")
+    try:
+        import anthropic
+        result = anthropic.Anthropic(api_key=api_key).messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=5,
+            system=_SYSTEM_PROMPT + f"\n\n{context}",
+            messages=[{"role": "user", "content": user_input}],
+        ).content[0].text.strip().lower().split()[0]
+        result = result if result in ("answer", "question", "query") else "query"
+        print(f"[CLASSIFIER] Haiku: {result}")
         return result
-
-    # Fallback: Haiku
-    result = _classify_with_haiku(user_input, context)
-    print(f"[CLASSIFIER] Haiku: {result}")
-    return result
+    except Exception as e:
+        print(f"[CLASSIFIER] Haiku error: {e}")
+        return "query"
 
 
 # Phrases that are always a query regardless of booking state or context.

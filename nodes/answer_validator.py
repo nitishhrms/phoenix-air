@@ -30,30 +30,17 @@ import os
 import json
 from langchain_core.messages import AIMessage
 
-# Auth states where the input_classifier always short-circuits to "answer",
-# so questions without explicit markers need an LLM check to be rerouted.
 _AUTH_STATES = {"COLLECTING_PHONE", "VERIFYING_OTP"}
 
-# ── Global intent override — LLM-powered, works at ANY booking stage ──────────
-#
-# If the classifier mistakenly labels a message as "answer", the validator
-# catches it here with an LLM call and reroutes back through intent_router.
-#
-# A tiny set of zero-ambiguity shortcuts fires before the LLM to save latency.
-# Everything else — including marker-free questions ("baggage fee", "wifi cost")
-# and ambiguous requests ("transfer my bags") — goes straight to Groq/Haiku.
-
-# Zero-ambiguity shortcuts: these strings ONLY ever mean one thing in context.
 _UNAMBIGUOUS_QUERY_KWS = [
     "start over", "restart", "begin again", "start again", "reset", "book another",
     "speak to a human", "talk to an agent", "live agent", "real person",
     "hello", "hi there", "hey there", "good morning", "good afternoon", "good evening",
-    # Field correction requests — always a query, never an answer to a booking prompt
     "update my", "i want to update", "i need to update",
     "want to change my", "need to change my", "i want to change my",
 ]
 
-_UNAMBIGUOUS_QUESTION_KWS = ["?"]   # literal "?" is always a question
+_UNAMBIGUOUS_QUESTION_KWS = ["?"]
 
 
 _DETECT_SYSTEM = (
@@ -74,45 +61,21 @@ _DETECT_SYSTEM = (
 
 def _llm_detect_intent(user_input: str, conv_state: str) -> tuple[str | None, bool]:
     """
-    Use Groq (fast) → Haiku (fallback) to detect if the input is actually a
-    question or query rather than a booking answer.
+    Use Haiku to detect if the input is actually a question or query rather than a booking answer.
     Returns (input_type, should_reroute) or (None, False).
     """
-    # Zero-ambiguity shortcuts — no LLM needed
     t = user_input.lower().strip()
     if any(kw in t for kw in _UNAMBIGUOUS_QUERY_KWS):
         return "query", True
     if any(kw in t for kw in _UNAMBIGUOUS_QUESTION_KWS):
         return "question", True
 
-    # LLM classification — Groq first (~100ms), Haiku fallback
-    context = f"Bot state: {conv_state}."
-
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    if groq_key:
-        try:
-            from groq import Groq
-            raw = Groq(api_key=groq_key).chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {"role": "system", "content": _DETECT_SYSTEM + "\n\n" + context},
-                    {"role": "user",   "content": user_input},
-                ],
-                max_tokens=5,
-                temperature=0,
-            ).choices[0].message.content.strip().lower().split()[0]
-            if raw in ("question", "query"):
-                print(f"[VALIDATOR] Groq: '{user_input[:40]}' -> {raw}")
-                return raw, True
-            return None, False
-        except Exception as e:
-            print(f"[VALIDATOR] Groq error: {e}")
-
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         return None, False
     try:
         import anthropic
+        context = f"Bot state: {conv_state}."
         raw = anthropic.Anthropic(api_key=api_key).messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=5,
@@ -139,15 +102,14 @@ _YES_RE       = re.compile(r"\b(yes|yeah|yep|yup|sure|ok|okay|confirm|correct|ri
 _NO_RE        = re.compile(r"\b(no|nope|nah|not|wrong|different|incorrect)\b", re.I)
 
 _DATE_PATTERNS = [
-    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),                                         # 2026-08-15
-    re.compile(r"\b\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b"),                          # 8/15/2026
-    re.compile(r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}\s*,?\s*\d{4}\b", re.I),  # Aug 15 2026
-    re.compile(r"\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{4}\b", re.I),       # 15 Aug 2026
+    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),
+    re.compile(r"\b\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b"),
+    re.compile(r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}\s*,?\s*\d{4}\b", re.I),
+    re.compile(r"\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{4}\b", re.I),
     re.compile(r"\bnext\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b", re.I),
     re.compile(r"\b(tomorrow|today|this\s+(?:friday|saturday|sunday|monday|tuesday|wednesday|thursday))\b", re.I),
 ]
 
-# Expected input description per state (shown to LLM)
 _STATE_EXPECTED = {
     "COLLECTING_DEPARTURE":   "a departure city name",
     "COLLECTING_DESTINATION": "a destination city name",
@@ -191,7 +153,7 @@ def _regex_validate(user_input: str, conv_state: str) -> tuple[bool, str]:
             return True, ""
         return False, "Please select a flight by entering its number — 1, 2, or 3."
 
-    return True, ""  # unhandled state, pass through
+    return True, ""
 
 
 # ── L2: LLM interpretation and spelling correction ────────────────────────────
@@ -222,37 +184,13 @@ def _parse_json_result(raw: str) -> dict:
 
 
 def _llm_interpret(user_input: str, conv_state: str, expected: str) -> dict:
-    """
-    Spell-correct / interpret the input.
-    Tries Groq first (fast), falls back to Haiku.
-    Returns {"corrected": str, "confident": bool}
-    """
-    system = _INTERPRET_SYSTEM + f"\n\nThe bot currently expects: {expected}."
-
-    # Primary: Groq
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    if groq_key:
-        try:
-            from groq import Groq
-            raw = Groq(api_key=groq_key).chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user",   "content": user_input},
-                ],
-                max_tokens=80,
-                temperature=0,
-            ).choices[0].message.content.strip()
-            return _parse_json_result(raw)
-        except Exception as e:
-            print(f"[VALIDATOR] Groq interpret error: {e}")
-
-    # Fallback: Haiku
+    """Spell-correct / interpret the input using Haiku."""
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         return {"corrected": "", "confident": False}
     try:
         import anthropic
+        system = _INTERPRET_SYSTEM + f"\n\nThe bot currently expects: {expected}."
         raw = anthropic.Anthropic(api_key=api_key).messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=80,
@@ -266,39 +204,14 @@ def _llm_interpret(user_input: str, conv_state: str, expected: str) -> dict:
 
 
 def _llm_parse_date(user_input: str) -> str:
-    """
-    Convert natural-language date to YYYY-MM-DD.
-    Tries Groq first, falls back to Haiku.
-    Returns YYYY-MM-DD string or empty string on failure.
-    """
+    """Convert natural-language date to YYYY-MM-DD using Haiku."""
     from datetime import date
-    today   = date.today().isoformat()
-    system  = (
+    today  = date.today().isoformat()
+    system = (
         f"Today's date is {today}. "
         "Convert the user's date input to YYYY-MM-DD format. "
         "Reply with ONLY the date in YYYY-MM-DD format, or 'invalid' if it cannot be converted."
     )
-
-    # Primary: Groq
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    if groq_key:
-        try:
-            from groq import Groq
-            raw = Groq(api_key=groq_key).chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user",   "content": user_input},
-                ],
-                max_tokens=20,
-                temperature=0,
-            ).choices[0].message.content.strip()
-            if re.match(r"^\d{4}-\d{2}-\d{2}$", raw):
-                return raw
-        except Exception as e:
-            print(f"[VALIDATOR] Groq date error: {e}")
-
-    # Fallback: Haiku
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         return ""
@@ -328,7 +241,6 @@ def answer_validator_node(state: dict) -> dict:
     # ── Pending correction confirmation flow ──────────────────────────────────
     if pending:
         if _YES_RE.search(user_input):
-            # User confirmed — use corrected value as effective input
             print(f"[VALIDATOR] correction confirmed: '{user_input}' -> '{pending}'")
             return {
                 **state,
@@ -337,7 +249,6 @@ def answer_validator_node(state: dict) -> dict:
                 "validated":          True,
             }
         elif _NO_RE.search(user_input):
-            # User rejected correction — ask again
             expected = _STATE_EXPECTED.get(conv_state, "your answer")
             resp = f"No problem! Could you please provide {expected} again?"
             msg  = AIMessage(content=resp)
@@ -350,19 +261,14 @@ def answer_validator_node(state: dict) -> dict:
                 "messages":           messages + [msg],
             }
         else:
-            # User gave a completely new answer — clear pending and re-validate below
             state = {**state, "pending_correction": None}
 
-    # ── Global intent override — LLM-powered, works at ANY booking stage ────────
-    # Catches greetings, transfers, policy questions, general questions, etc.
-    # even when the input_classifier mistakenly labelled them "answer".
-    # Uses Groq (~100ms) → Haiku fallback. Zero-ambiguity shortcuts fire first.
+    # ── Global intent override ────────────────────────────────────────────────
     new_type, reroute = _llm_detect_intent(user_input, conv_state)
     if reroute:
         print(f"[VALIDATOR] rerouting '{user_input[:40]}' as {new_type}")
         return {**state, "input_type": new_type, "validated": True}
 
-    # States with no validation needed
     if conv_state not in _STATE_EXPECTED:
         return {**state, "validated": True}
 
@@ -372,9 +278,7 @@ def answer_validator_node(state: dict) -> dict:
     is_valid, hint = _regex_validate(user_input, conv_state)
 
     if is_valid:
-        # Date: attempt LLM normalisation (e.g. "next tuesday" -> "2026-05-26")
         if conv_state == "COLLECTING_DATE":
-            # Check if it's already YYYY-MM-DD or close
             if not re.match(r"^\d{4}-\d{2}-\d{2}$", user_input):
                 normalised = _llm_parse_date(user_input)
                 if normalised:
@@ -389,11 +293,9 @@ def answer_validator_node(state: dict) -> dict:
     if correction["corrected"]:
         corrected = correction["corrected"]
         if correction["confident"]:
-            # High confidence: ask "did you mean?" and store for next turn
             resp = f"Did you mean '{corrected}'? Say yes to continue or provide the correct information."
             print(f"[VALIDATOR] suggesting: '{corrected}' (confident)")
         else:
-            # Low confidence: still ask, but acknowledge uncertainty
             resp = f"I'm not sure — did you mean '{corrected}'? Say yes to continue or type it again."
             print(f"[VALIDATOR] suggesting: '{corrected}' (uncertain)")
 
@@ -407,7 +309,6 @@ def answer_validator_node(state: dict) -> dict:
             "messages":           messages + [msg],
         }
 
-    # LLM couldn't interpret either — return regex hint
     resp = f"I didn't quite catch that. {hint}"
     msg  = AIMessage(content=resp)
     return {

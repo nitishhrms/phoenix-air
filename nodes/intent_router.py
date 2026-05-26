@@ -401,41 +401,17 @@ def _llm_intent(text: str) -> str:
 
 
 def _llm_check_greeting(text: str) -> bool:
-    """
-    Detect whether input is a greeting or casual social opener.
-    Tries Groq first (fast), falls back to Haiku.
-    Used as the last resort before declaring out_of_domain.
-    """
-    system = (
-        "Is this message a greeting, farewell, or casual social opener "
-        "(e.g. 'hello', 'hi there', 'good morning', 'thanks', 'bye', 'how are you')? "
-        "Reply with ONLY 'yes' or 'no'."
-    )
-
-    # Primary: Groq
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    if groq_key:
-        try:
-            from groq import Groq
-            raw = Groq(api_key=groq_key).chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user",   "content": text},
-                ],
-                max_tokens=3,
-                temperature=0,
-            ).choices[0].message.content.strip().lower()
-            return raw.startswith("yes")
-        except Exception as e:
-            print(f"[INTENT] Groq greeting check error: {e}")
-
-    # Fallback: Haiku
+    """Detect whether input is a greeting or casual social opener using Haiku."""
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         return False
     try:
         import anthropic
+        system = (
+            "Is this message a greeting, farewell, or casual social opener "
+            "(e.g. 'hello', 'hi there', 'good morning', 'thanks', 'bye', 'how are you')? "
+            "Reply with ONLY 'yes' or 'no'."
+        )
         raw = anthropic.Anthropic(api_key=api_key).messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=3,
